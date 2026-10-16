@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Verificación Mermaid — tienda-libros</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem; background: #fafafa; }
+  h2 { margin-top: 2rem; }
+  .diagrama { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; background: #fff; }
+  .ok { color: #0a0; font-weight: bold; }
+  .error { color: #c00; font-weight: bold; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>Verificación de diagramas Mermaid</h1>
+<p id="resultado">Renderizando…</p>
+<div id="contenedor"></div>
+<script type="module">
+mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+const diagramas = ["flowchart TD\n    CL[\"Cliente<br/>GET http://localhost:8080/api/libros\"]\n    PX[\"proxy · nginx<br/>location /api/ → proxy_pass http://api:3000/<br/>(reescribe /api/libros como /libros)\"]\n    API[\"api · Express<br/>app.get('/libros')\"]\n    CK{\"await cache.get('libros')\"}\n    HIT[\"HIT: Redis devuelve el JSON cacheado\"]\n    MISS[\"MISS: no hay valor en Redis\"]\n    DB[\"PostgreSQL<br/>SELECT id, titulo, autor, precio<br/>FROM libros ORDER BY id\"]\n    SET[\"cache.set('libros', JSON.stringify(rows), EX: 60)<br/>(TTL 60 segundos)\"]\n    R1[\"200 OK<br/>res.json(JSON.parse(enCache))\"]\n    R2[\"200 OK<br/>res.json(rows)\"]\n    FIN[\"El cliente recibe la lista de libros\"]\n\n    CL --> PX --> API --> CK\n    CK -- \"sí (hit)\" --> HIT --> R1 --> FIN\n    CK -- \"no (miss)\" --> MISS --> DB --> SET --> R2 --> FIN\n","flowchart TD\n    CL[\"Cliente<br/>POST http://localhost:8080/api/pedidos<br/>body: libroId, unidades\"]\n    PX[\"proxy · nginx<br/>location /api/ → proxy_pass http://api:3000/<br/>(/api/pedidos → /pedidos)\"]\n    API[\"api · Express + express.json()<br/>app.post('/pedidos')\"]\n    VAL{\"¿libroId y unidades?\"}\n    E400[\"400 · error: 'Faltan datos'\"]\n    INS[\"PostgreSQL<br/>INSERT INTO pedidos (libro_id, unidades)<br/>VALUES ($1, $2) RETURNING id\"]\n    LPUSH[\"cache.lPush('cola:facturas', String(id))\"]\n    R201[\"201 · pedido: id\"]\n    WST[\"worker · inicio<br/>cache.connect() + log 'Worker de facturas en marcha'\"]\n    WLOOP[\"worker · bucle infinito<br/>await cache.brPop('cola:facturas', 0) — bloqueante\"]\n    WLOG[\"console.log('Generando la factura del pedido', id)<br/>(única acción del worker: registrar en el log)\"]\n\n    CL --> PX --> API --> VAL\n    VAL -- \"no (ausente o 0)\" --> E400 --> EC[\"Cliente recibe el error 400\"]\n    VAL -- \"sí\" --> INS --> LPUSH --> R201 --> OC[\"Cliente recibe el nº de pedido\"]\n    LPUSH -. \"el id queda encolado en Redis; la API NO espera al worker\" .-> WLOOP\n    WST --> WLOOP\n    WLOOP -- \"llega un id\" --> WLOG --> WLOOP\n"];
+const resultado = { total: diagramas.length, ok: 0, errores: [] };
+const cont = document.getElementById('contenedor');
+for (let i = 0; i < diagramas.length; i++) {
+  const h = document.createElement('h2');
+  h.textContent = 'Diagrama ' + (i + 1);
+  cont.appendChild(h);
+  const div = document.createElement('div');
+  div.className = 'diagrama';
+  cont.appendChild(div);
+  try {
+    const { svg } = await mermaid.render('diagrama-' + i, diagramas[i]);
+    div.innerHTML = svg;
+    resultado.ok++;
+  } catch (e) {
+    const msg = e && e.message ? e.message : String(e);
+    div.innerHTML = '<p class="error">' + msg + '</p>';
+    resultado.errores.push(msg);
+  }
+}
+window.__mermaidResult = resultado;
+const el = document.getElementById('resultado');
+el.textContent =
+  'Diagramas: ' + resultado.total + ' · renderizados OK: ' + resultado.ok +
+  ' · errores: ' + resultado.errores.length +
+  (resultado.errores.length ? ' → ' + resultado.errores.join(' | ') : '');
+el.className = resultado.errores.length ? 'error' : 'ok';
+</script>
+</body>
+</html>

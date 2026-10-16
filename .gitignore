@@ -1,0 +1,24 @@
+# --- Secretos y configuración local ---
+.env
+.env.local
+.env.*.local
+
+# --- Dependencias instaladas ---
+node_modules/
+
+# --- Registros ---
+*.log
+npm-debug.log*
+
+# --- Datos locales de los volúmenes (si se montan en el proyecto) ---
+datos-db/
+datos-cache/
+
+# --- Artefactos y temporales ---
+dist/
+coverage/
+
+# --- Sistema operativo / editor ---
+.DS_Store
+Thumbs.db
+*.swp
